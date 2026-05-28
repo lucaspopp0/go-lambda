@@ -3,3 +3,4 @@ component: lambda-go
 type: library
 
 language: go
+tag-prefix: v
