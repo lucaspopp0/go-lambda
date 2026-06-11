@@ -1,4 +1,4 @@
-module github.com/rx-refill-reminders/go-lambda
+module github.com/lucaspopp0/go-lambda
 
 go 1.25.0
 
