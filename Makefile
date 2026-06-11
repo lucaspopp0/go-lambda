@@ -4,15 +4,11 @@ SHELL := bash
 tidy:
 	go mod tidy
 
-.PHONY: tidy
-lint:
+.PHONY: lint
+lint: tidy
 	go vet ./...
 	go fmt ./...
 
 .PHONY: unit-test
 unit-test:
 	go test ./...
-
-.PHONY: build
-build:
-	../scripts/build.sh
