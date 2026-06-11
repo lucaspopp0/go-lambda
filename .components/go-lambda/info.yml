@@ -1,6 +1,9 @@
-path: .
+# yaml-language-server: $schema=https://raw.githubusercontent.com/slingshot-pipelines/jsonschemas/main/schemas/component/v1/component.schema.json
+
 component: go-lambda
 type: library
 
-language: go
+path: .
+
+source-language: go
 tag-prefix: v
