@@ -28,7 +28,7 @@ jobs:
       changed-components-by-type: ${{ steps.changed-components.outputs.changed-components-by-type }}
     steps:
       -
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       -
         name: Detect changed components
         id: changed-components
