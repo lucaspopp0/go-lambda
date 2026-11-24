@@ -2,6 +2,7 @@ package eventwrappers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 )
@@ -25,14 +26,34 @@ type apiGatewayV2Request struct {
 }
 
 func (r *apiGatewayV2Request) Method() string             { return r.event.RequestContext.HTTP.Method }
-func (r *apiGatewayV2Request) Path() string               { return r.event.RawPath }
 func (r *apiGatewayV2Request) RawQuery() string           { return r.event.RawQueryString }
 func (r *apiGatewayV2Request) Headers() map[string]string { return copyHeaders(r.event.Headers) }
 func (r *apiGatewayV2Request) Header(name string) string  { return lookupHeader(r.event.Headers, name) }
 func (r *apiGatewayV2Request) Cookies() []string          { return append([]string(nil), r.event.Cookies...) }
 func (r *apiGatewayV2Request) Unwrap() any                { return r.event }
+
+// Path returns the raw path with the stage prefix removed.
+func (r *apiGatewayV2Request) Path() string {
+	path := r.event.RawPath
+	if stage := r.event.RequestContext.Stage; stage != "" {
+		prefix := "/" + stage
+		if path == prefix {
+			return "/"
+		}
+		// Only strip a whole leading path segment, not a partial match
+		if strings.HasPrefix(path, prefix+"/") {
+			return path[len(prefix):]
+		}
+	}
+	return path
+}
+
 func (r *apiGatewayV2Request) Body() ([]byte, error) {
 	return decodeBody(r.event.Body, r.event.IsBase64Encoded)
+}
+
+func (r *apiGatewayV2Request) ToHttpRequest() (*http.Request, error) {
+	return buildHttpRequest(r)
 }
 
 type apiGatewayV2Response struct {
@@ -82,4 +103,20 @@ func (r *apiGatewayV2Response) AddHeader(name, value string) {
 		value = existing + ", " + value
 	}
 	r.SetHeader(name, value)
+}
+
+func (r *apiGatewayV2Response) FromHttpResponse(code int, header http.Header, body []byte) {
+	r.event.StatusCode = code
+	r.event.Cookies = nil
+	r.event.Headers = map[string]string{}
+	r.event.MultiValueHeaders = map[string][]string{}
+
+	for name, values := range header {
+		if len(values) > 0 {
+			r.event.Headers[name] = values[len(values)-1]
+			r.event.MultiValueHeaders[name] = values
+		}
+	}
+
+	setHttpBody(r, r.event.Headers["Content-Type"], body)
 }

@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/lucaspopp0/go-lambda/eventwrappers"
 )
 
 type CORSOptions struct {
@@ -19,7 +20,7 @@ var ValidOrigins = []string{
 func WithCORS(opts CORSOptions) func(next HandlerFunc) HandlerFunc {
 	return func(next HandlerFunc) HandlerFunc {
 		return func(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-			requestOrigin := getOrigin(event.Headers)
+			requestOrigin := eventwrappers.WrapAPIGatewayV2Request(event).Header("Origin")
 
 			response, err := next(ctx, event)
 			if err != nil {
@@ -45,14 +46,4 @@ func WithCORS(opts CORSOptions) func(next HandlerFunc) HandlerFunc {
 			return response, nil
 		}
 	}
-}
-
-func getOrigin(headers map[string]string) string {
-	if origin, ok := headers["Origin"]; ok {
-		return origin
-	}
-	if origin, ok := headers["origin"]; ok {
-		return origin
-	}
-	return ""
 }

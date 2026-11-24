@@ -117,3 +117,25 @@ func TestGenericHandler(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestHandlers_InvalidBase64BodyIs400(t *testing.T) {
+	api := newTestAPI(t)
+
+	url, err := FunctionURLHandler(context.Background(), api, events.LambdaFunctionURLRequest{
+		RawPath: "/", Body: "!!", IsBase64Encoded: true,
+		RequestContext: events.LambdaFunctionURLRequestContext{
+			HTTP: events.LambdaFunctionURLRequestContextHTTPDescription{Method: "POST"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, url.StatusCode)
+
+	v2, err := APIGatewayV2Handler(context.Background(), api, events.APIGatewayV2HTTPRequest{
+		RawPath: "/", Body: "!!", IsBase64Encoded: true,
+		RequestContext: events.APIGatewayV2HTTPRequestContext{
+			HTTP: events.APIGatewayV2HTTPRequestContextHTTPDescription{Method: "POST"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusBadRequest, v2.StatusCode)
+}

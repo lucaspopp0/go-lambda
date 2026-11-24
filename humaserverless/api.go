@@ -2,6 +2,7 @@ package humaserverless
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humachi"
 	"github.com/go-chi/chi/v5"
+	"github.com/lucaspopp0/go-lambda/eventwrappers"
 )
 
 type ApiOpts struct {
@@ -177,7 +179,7 @@ func APIGatewayV2Handler(
 	request, err := EventToRequest(event)
 	if err != nil {
 		return events.APIGatewayV2HTTPResponse{
-			StatusCode: http.StatusInternalServerError,
+			StatusCode: errorStatus(err),
 			Body:       err.Error(),
 		}, nil
 	}
@@ -196,11 +198,20 @@ func FunctionURLHandler(
 	request, err := FunctionURLEventToRequest(event)
 	if err != nil {
 		return events.LambdaFunctionURLResponse{
-			StatusCode: http.StatusInternalServerError,
+			StatusCode: errorStatus(err),
 			Body:       err.Error(),
 		}, nil
 	}
 	response := httptest.NewRecorder()
 	api.Adapter().ServeHTTP(response, request.WithContext(ctx))
 	return *ResponseToFunctionURLEvent(*response), nil
+}
+
+// errorStatus maps a request conversion error to an HTTP status: 400 for a body
+// that can't be decoded, 500 otherwise.
+func errorStatus(err error) int {
+	if errors.Is(err, eventwrappers.ErrInvalidBody) {
+		return http.StatusBadRequest
+	}
+	return http.StatusInternalServerError
 }
