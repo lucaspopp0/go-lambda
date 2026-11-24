@@ -2,6 +2,7 @@ package eventwrappers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 )
@@ -31,7 +32,14 @@ func (r *apiGatewayV2Request) Headers() map[string]string { return copyHeaders(r
 func (r *apiGatewayV2Request) Header(name string) string  { return lookupHeader(r.event.Headers, name) }
 func (r *apiGatewayV2Request) Cookies() []string          { return append([]string(nil), r.event.Cookies...) }
 func (r *apiGatewayV2Request) Unwrap() any                { return r.event }
-func (r *apiGatewayV2Request) stage() string              { return r.event.RequestContext.Stage }
+
+func (r *apiGatewayV2Request) ToHTTPRequest() (*http.Request, error) {
+	path := r.event.RawPath
+	if stage := r.event.RequestContext.Stage; stage != "" {
+		path = strings.TrimPrefix(path, "/"+stage)
+	}
+	return buildHTTPRequest(r, path)
+}
 func (r *apiGatewayV2Request) Body() ([]byte, error) {
 	return decodeBody(r.event.Body, r.event.IsBase64Encoded)
 }
@@ -83,4 +91,20 @@ func (r *apiGatewayV2Response) AddHeader(name, value string) {
 		value = existing + ", " + value
 	}
 	r.SetHeader(name, value)
+}
+
+func (r *apiGatewayV2Response) FromHTTPResponse(code int, header http.Header, body []byte) {
+	r.event.StatusCode = code
+	r.event.Cookies = nil
+	r.event.Headers = map[string]string{}
+	r.event.MultiValueHeaders = map[string][]string{}
+
+	for name, values := range header {
+		if len(values) > 0 {
+			r.event.Headers[name] = values[len(values)-1]
+			r.event.MultiValueHeaders[name] = values
+		}
+	}
+
+	setHTTPBody(r, r.event.Headers["Content-Type"], body)
 }

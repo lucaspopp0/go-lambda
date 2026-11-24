@@ -2,6 +2,7 @@ package eventwrappers
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 )
@@ -31,6 +32,9 @@ func (r *functionURLRequest) Headers() map[string]string { return copyHeaders(r.
 func (r *functionURLRequest) Header(name string) string  { return lookupHeader(r.event.Headers, name) }
 func (r *functionURLRequest) Cookies() []string          { return append([]string(nil), r.event.Cookies...) }
 func (r *functionURLRequest) Unwrap() any                { return r.event }
+func (r *functionURLRequest) ToHTTPRequest() (*http.Request, error) {
+	return buildHTTPRequest(r, r.event.RawPath)
+}
 func (r *functionURLRequest) Body() ([]byte, error) {
 	return decodeBody(r.event.Body, r.event.IsBase64Encoded)
 }
@@ -78,4 +82,24 @@ func (r *functionURLResponse) AddHeader(name, value string) {
 		value = existing + ", " + value
 	}
 	r.SetHeader(name, value)
+}
+
+func (r *functionURLResponse) FromHTTPResponse(code int, header http.Header, body []byte) {
+	r.event.StatusCode = code
+	r.event.Cookies = nil
+	r.event.Headers = map[string]string{}
+
+	for name, values := range header {
+		if len(values) == 0 {
+			continue
+		}
+		if http.CanonicalHeaderKey(name) == "Set-Cookie" {
+			r.event.Cookies = append(r.event.Cookies, values...)
+			continue
+		}
+		// Function URLs only support single-valued headers; join multiple values
+		r.event.Headers[name] = strings.Join(values, ", ")
+	}
+
+	setHTTPBody(r, r.event.Headers["Content-Type"], body)
 }

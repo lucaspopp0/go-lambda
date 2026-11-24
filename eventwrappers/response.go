@@ -1,5 +1,7 @@
 package eventwrappers
 
+import "net/http"
+
 // HttpResponse is a common, mutable view over the HTTP response events returned
 // from Lambda handlers.
 type HttpResponse interface {
@@ -25,6 +27,13 @@ type HttpResponse interface {
 	SetBody(body string)
 	// SetBinaryBody sets a binary body, base64-encoding it in the event.
 	SetBinaryBody(body []byte)
+	// FromHTTPResponse replaces the status, headers, cookies and body with the
+	// given HTTP response parts. Binary content types are base64-encoded.
+	// Multi-valued headers are represented as the event allows: API Gateway v2
+	// keeps the last value in Headers and all values in MultiValueHeaders, while
+	// Function URLs join them with ", ". Set-Cookie values go to the cookies
+	// on Function URLs.
+	FromHTTPResponse(code int, header http.Header, body []byte)
 	// Unwrap returns the original event value (e.g. events.APIGatewayV2HTTPResponse).
 	Unwrap() any
 }

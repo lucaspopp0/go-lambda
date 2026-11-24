@@ -1,5 +1,7 @@
 package eventwrappers
 
+import "net/http"
+
 // HttpRequest is a common view over the HTTP request events delivered to Lambda.
 type HttpRequest interface {
 	// Method is the HTTP method, e.g. "GET".
@@ -16,6 +18,9 @@ type HttpRequest interface {
 	Cookies() []string
 	// Body returns the request body, base64-decoding it if needed.
 	Body() ([]byte, error)
+	// ToHTTPRequest converts the event into an *http.Request. For API Gateway v2
+	// events the stage prefix is stripped from the path.
+	ToHTTPRequest() (*http.Request, error)
 	// Unwrap returns the original event value (e.g. events.APIGatewayV2HTTPRequest).
 	Unwrap() any
 }

@@ -154,7 +154,7 @@ func TestToHTTPRequest(t *testing.T) {
 				HTTP:  events.APIGatewayV2HTTPRequestContextHTTPDescription{Method: "POST"},
 			},
 		}
-		r, err := ToHTTPRequest(WrapAPIGatewayV2Request(event))
+		r, err := WrapAPIGatewayV2Request(event).ToHTTPRequest()
 		require.NoError(t, err)
 		assert.Equal(t, "POST", r.Method)
 		assert.Equal(t, "/users", r.URL.Path)
@@ -166,18 +166,23 @@ func TestToHTTPRequest(t *testing.T) {
 	})
 
 	t.Run("function-url does not strip a stage-like prefix", func(t *testing.T) {
-		r, err := ToHTTPRequest(WrapFunctionURLRequest(events.LambdaFunctionURLRequest{RawPath: "/prod/users"}))
+		r, err := WrapFunctionURLRequest(events.LambdaFunctionURLRequest{RawPath: "/prod/users"}).ToHTTPRequest()
 		require.NoError(t, err)
 		assert.Equal(t, "/prod/users", r.URL.Path)
 	})
 
 	t.Run("invalid base64 errors", func(t *testing.T) {
-		_, err := ToHTTPRequest(WrapFunctionURLRequest(events.LambdaFunctionURLRequest{Body: "!!", IsBase64Encoded: true}))
+		_, err := WrapFunctionURLRequest(events.LambdaFunctionURLRequest{Body: "!!", IsBase64Encoded: true}).ToHTTPRequest()
 		assert.Error(t, err)
 	})
 }
 
-func TestResponseFromHTTP(t *testing.T) {
+func fromHTTP[T any](resp HttpResponse, code int, h http.Header, body []byte) (T, bool) {
+	resp.FromHTTPResponse(code, h, body)
+	return UnwrapResponse[T](resp)
+}
+
+func TestFromHTTPResponse(t *testing.T) {
 	h := http.Header{}
 	h.Add("Content-Type", "image/png")
 	h.Add("X-Multi", "a")
@@ -186,7 +191,7 @@ func TestResponseFromHTTP(t *testing.T) {
 	h.Add("Set-Cookie", "b=2")
 
 	t.Run("apigw-v2", func(t *testing.T) {
-		e, ok := UnwrapResponse[events.APIGatewayV2HTTPResponse](APIGatewayV2ResponseFromHTTP(201, h, []byte{1, 2}))
+		e, ok := fromHTTP[events.APIGatewayV2HTTPResponse](NewAPIGatewayV2Response(nil), 201, h, []byte{1, 2})
 		require.True(t, ok)
 		assert.Equal(t, 201, e.StatusCode)
 		assert.Equal(t, "b", e.Headers["X-Multi"])
@@ -195,7 +200,7 @@ func TestResponseFromHTTP(t *testing.T) {
 	})
 
 	t.Run("function-url", func(t *testing.T) {
-		e, ok := UnwrapResponse[events.LambdaFunctionURLResponse](FunctionURLResponseFromHTTP(200, h, []byte{1, 2}))
+		e, ok := fromHTTP[events.LambdaFunctionURLResponse](NewFunctionURLResponse(nil), 200, h, []byte{1, 2})
 		require.True(t, ok)
 		assert.Equal(t, "a, b", e.Headers["X-Multi"])
 		assert.Equal(t, []string{"a=1", "b=2"}, e.Cookies)
@@ -204,7 +209,7 @@ func TestResponseFromHTTP(t *testing.T) {
 	})
 
 	t.Run("text body", func(t *testing.T) {
-		e, _ := UnwrapResponse[events.LambdaFunctionURLResponse](FunctionURLResponseFromHTTP(200, http.Header{}, []byte("hi")))
+		e, _ := fromHTTP[events.LambdaFunctionURLResponse](NewFunctionURLResponse(nil), 200, http.Header{}, []byte("hi"))
 		assert.Equal(t, "hi", e.Body)
 		assert.False(t, e.IsBase64Encoded)
 	})

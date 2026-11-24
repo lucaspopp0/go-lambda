@@ -49,8 +49,8 @@ resp.SetHeader("Content-Type", "application/json")
 resp.SetBody(`{"path":"` + req.Path() + `"}`)
 
 // Convert to / from net/http
-httpReq, _ := eventwrappers.ToHTTPRequest(req)
-resp = eventwrappers.FunctionURLResponseFromHTTP(code, header, body) // or APIGatewayV2ResponseFromHTTP
+httpReq, _ := req.ToHTTPRequest()
+resp.FromHTTPResponse(code, header, body)
 
 // Back to the original types
 original, ok := eventwrappers.UnwrapRequest[events.LambdaFunctionURLRequest](req)
