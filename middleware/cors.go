@@ -4,8 +4,6 @@ import (
 	"context"
 	"log"
 	"slices"
-
-	"github.com/aws/aws-lambda-go/events"
 )
 
 type CORSOptions struct {
@@ -16,30 +14,23 @@ var ValidOrigins = []string{
 	"http://localhost:8081",
 }
 
-func WithCORS(opts CORSOptions) func(next HandlerFunc) HandlerFunc {
-	return func(next HandlerFunc) HandlerFunc {
-		return func(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-			requestOrigin := getOrigin(event.Headers)
+func WithCORS[Req Request, Resp Response](opts CORSOptions) func(next HandlerFunc[Req, Resp]) HandlerFunc[Req, Resp] {
+	return func(next HandlerFunc[Req, Resp]) HandlerFunc[Req, Resp] {
+		return func(ctx context.Context, event Req) (Resp, error) {
+			requestOrigin := getOrigin(requestHeaders(event))
 
 			response, err := next(ctx, event)
 			if err != nil {
 				log.Printf("caught error: %v", err)
-				return events.APIGatewayV2HTTPResponse{
-					StatusCode: 500,
-					Body:       err.Error(),
-				}, nil
+				return errorResponse[Resp](500, err.Error()), nil
 			}
 
-			if response.Headers == nil {
-				response.Headers = make(map[string]string)
-			}
-
-			response.Headers["Access-Control-Allow-Methods"] = "*"
-			response.Headers["Access-Control-Allow-Headers"] = "*"
-			response.Headers["Access-Control-Allow-Credentials"] = "true"
+			setHeader(&response, "Access-Control-Allow-Methods", "*")
+			setHeader(&response, "Access-Control-Allow-Headers", "*")
+			setHeader(&response, "Access-Control-Allow-Credentials", "true")
 
 			if requestOrigin != "" && slices.Contains(opts.ValidOrigins, requestOrigin) {
-				response.Headers["Access-Control-Allow-Origin"] = requestOrigin
+				setHeader(&response, "Access-Control-Allow-Origin", requestOrigin)
 			}
 
 			return response, nil

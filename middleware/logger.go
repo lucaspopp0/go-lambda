@@ -2,10 +2,8 @@ package middleware
 
 import (
 	"context"
-	"os"
-
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/lucaspopp0/go-lambda/logs"
+	"os"
 )
 
 type contextKey string
@@ -14,8 +12,8 @@ const (
 	ctxKeyLogger contextKey = "middleware_logger"
 )
 
-func WithLogger(next HandlerFunc) HandlerFunc {
-	return func(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+func WithLogger[Req Request, Resp Response](next HandlerFunc[Req, Resp]) HandlerFunc[Req, Resp] {
+	return func(ctx context.Context, event Req) (Resp, error) {
 		logger := logs.NewLogger(logs.LoggerOpts{
 			Out: os.Stdout,
 		})
@@ -34,9 +32,9 @@ func WithLogger(next HandlerFunc) HandlerFunc {
 		ctx = logs.WithAnnotation(ctx, "response", response)
 
 		logResponse := logger.Info
-		if response.StatusCode >= 500 {
+		if statusCode(response) >= 500 {
 			logResponse = logger.Error
-		} else if response.StatusCode >= 400 {
+		} else if statusCode(response) >= 400 {
 			logResponse = logger.Warn
 		}
 
