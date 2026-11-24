@@ -11,7 +11,7 @@ api := humaserverless.NewServerless(humaserverless.ApiOpts{Name: "my-api"})
 
 // API Gateway v2
 lambda.Start(func(ctx context.Context, e events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	return humaserverless.HttpHandler(ctx, api, e)
+	return humaserverless.APIGatewayV2Handler(ctx, api, e)
 })
 
 // Lambda Function URL

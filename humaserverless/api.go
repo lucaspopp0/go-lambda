@@ -144,7 +144,7 @@ func Handler[Req Request, Resp Response](
 		if !ok {
 			return resp, fmt.Errorf("humaserverless: response type %T does not match request type %T", resp, event)
 		}
-		*out, _ = HttpHandler(ctx, api, e)
+		*out, _ = APIGatewayV2Handler(ctx, api, e)
 	case events.LambdaFunctionURLRequest:
 		out, ok := any(&resp).(*events.LambdaFunctionURLResponse)
 		if !ok {
@@ -156,8 +156,20 @@ func Handler[Req Request, Resp Response](
 	return resp, nil
 }
 
-// HttpHandler handles a single API Gateway v2 request using a pre-built API (caller must register routes).
+// HttpHandler is the original name of APIGatewayV2Handler.
+//
+// Deprecated: use APIGatewayV2Handler.
 func HttpHandler(
+	ctx context.Context,
+	api huma.API,
+	event events.APIGatewayV2HTTPRequest,
+) (events.APIGatewayV2HTTPResponse, error) {
+	return APIGatewayV2Handler(ctx, api, event)
+}
+
+// APIGatewayV2Handler handles a single API Gateway v2 (HTTP API) request using a
+// pre-built API (caller must register routes).
+func APIGatewayV2Handler(
 	ctx context.Context,
 	api huma.API,
 	event events.APIGatewayV2HTTPRequest,
