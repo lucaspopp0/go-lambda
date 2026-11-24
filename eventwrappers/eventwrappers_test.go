@@ -259,3 +259,20 @@ func TestWrapRequestAndResponse(t *testing.T) {
 	_, ok = UnwrapResponse[events.LambdaFunctionURLResponse](empty)
 	assert.True(t, ok)
 }
+
+func TestAPIGatewayV2PathStripsWholeStageSegment(t *testing.T) {
+	cases := map[string]string{
+		"/prod/users": "/users",
+		"/prod":       "/",
+		"/prod/":      "/",
+		"/products/1": "/products/1",
+		"/users":      "/users",
+	}
+	for raw, want := range cases {
+		req := WrapAPIGatewayV2Request(events.APIGatewayV2HTTPRequest{
+			RawPath:        raw,
+			RequestContext: events.APIGatewayV2HTTPRequestContext{Stage: "prod"},
+		})
+		assert.Equal(t, want, req.Path(), raw)
+	}
+}

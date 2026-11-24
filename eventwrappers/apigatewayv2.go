@@ -27,10 +27,18 @@ type apiGatewayV2Request struct {
 
 func (r *apiGatewayV2Request) Method() string { return r.event.RequestContext.HTTP.Method }
 func (r *apiGatewayV2Request) Path() string {
+	path := r.event.RawPath
 	if stage := r.event.RequestContext.Stage; stage != "" {
-		return strings.TrimPrefix(r.event.RawPath, "/"+stage)
+		prefix := "/" + stage
+		if path == prefix {
+			return "/"
+		}
+		// Only strip a whole leading path segment, not a partial match
+		if strings.HasPrefix(path, prefix+"/") {
+			return path[len(prefix):]
+		}
 	}
-	return r.event.RawPath
+	return path
 }
 
 func (r *apiGatewayV2Request) RawQuery() string           { return r.event.RawQueryString }
