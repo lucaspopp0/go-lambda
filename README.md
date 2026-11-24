@@ -52,6 +52,10 @@ resp.SetBody(`{"path":"` + req.Path() + `"}`)
 httpReq, _ := req.ToHTTPRequest()
 resp.FromHTTPResponse(code, header, body)
 
+// Or, straight from the event types
+httpReq, _ = eventwrappers.ToHttpRequest(event)
+out2 := eventwrappers.FromHttpResponse[events.LambdaFunctionURLResponse](code, header, body)
+
 // Back to the original types
 original, ok := eventwrappers.UnwrapRequest[events.LambdaFunctionURLRequest](req)
 out, _ := eventwrappers.UnwrapResponse[events.LambdaFunctionURLResponse](resp)

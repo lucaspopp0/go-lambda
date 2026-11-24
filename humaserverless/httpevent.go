@@ -10,25 +10,23 @@ import (
 
 // Convert the API Gateway event into a HTTP request
 func EventToRequest(event events.APIGatewayV2HTTPRequest) (*http.Request, error) {
-	return eventwrappers.WrapAPIGatewayV2Request(event).ToHTTPRequest()
+	return eventwrappers.ToHttpRequest(event)
 }
 
 // Convert the Lambda function URL event into a HTTP request
 func FunctionURLEventToRequest(event events.LambdaFunctionURLRequest) (*http.Request, error) {
-	return eventwrappers.WrapFunctionURLRequest(event).ToHTTPRequest()
+	return eventwrappers.ToHttpRequest(event)
 }
 
 // Serve the HTTP request to the API's adapter
 // Convert the response to the API gateway response
 func ResponseToEvent(response httptest.ResponseRecorder) *events.APIGatewayV2HTTPResponse {
-	event := &events.APIGatewayV2HTTPResponse{}
-	eventwrappers.NewAPIGatewayV2Response(event).FromHTTPResponse(response.Code, response.Header(), response.Body.Bytes())
-	return event
+	event := eventwrappers.FromHttpResponse[events.APIGatewayV2HTTPResponse](response.Code, response.Header(), response.Body.Bytes())
+	return &event
 }
 
 // Convert the recorded response to a Lambda function URL response
 func ResponseToFunctionURLEvent(response httptest.ResponseRecorder) *events.LambdaFunctionURLResponse {
-	event := &events.LambdaFunctionURLResponse{}
-	eventwrappers.NewFunctionURLResponse(event).FromHTTPResponse(response.Code, response.Header(), response.Body.Bytes())
-	return event
+	event := eventwrappers.FromHttpResponse[events.LambdaFunctionURLResponse](response.Code, response.Header(), response.Body.Bytes())
+	return &event
 }

@@ -5,7 +5,45 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+
+	"github.com/aws/aws-lambda-go/events"
 )
+
+// RequestEvent is the set of Lambda HTTP request events that can be wrapped.
+type RequestEvent interface {
+	events.APIGatewayV2HTTPRequest | events.LambdaFunctionURLRequest
+}
+
+// ResponseEvent is the set of Lambda HTTP response events that can be wrapped.
+type ResponseEvent interface {
+	events.APIGatewayV2HTTPResponse | events.LambdaFunctionURLResponse
+}
+
+// ToHttpRequest wraps the given Lambda request event and converts it into an
+// *http.Request, by calling HttpRequest.ToHTTPRequest on the matching wrapper.
+func ToHttpRequest[T RequestEvent](event T) (*http.Request, error) {
+	switch e := any(event).(type) {
+	case events.APIGatewayV2HTTPRequest:
+		return WrapAPIGatewayV2Request(e).ToHTTPRequest()
+	case events.LambdaFunctionURLRequest:
+		return WrapFunctionURLRequest(e).ToHTTPRequest()
+	}
+	panic("eventwrappers: unreachable: unsupported request event type")
+}
+
+// FromHttpResponse creates a new, empty Lambda response event of type T and
+// fills it from the given HTTP response parts, by calling
+// HttpResponse.FromHTTPResponse on the matching wrapper.
+func FromHttpResponse[T ResponseEvent](code int, header http.Header, body []byte) T {
+	var event T
+	switch e := any(&event).(type) {
+	case *events.APIGatewayV2HTTPResponse:
+		NewAPIGatewayV2Response(e).FromHTTPResponse(code, header, body)
+	case *events.LambdaFunctionURLResponse:
+		NewFunctionURLResponse(e).FromHTTPResponse(code, header, body)
+	}
+	return event
+}
 
 // HttpRequest is a common view over the HTTP request events delivered to Lambda.
 type HttpRequest interface {

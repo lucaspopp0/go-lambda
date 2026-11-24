@@ -214,3 +214,31 @@ func TestFromHTTPResponse(t *testing.T) {
 		assert.False(t, e.IsBase64Encoded)
 	})
 }
+
+func TestGenericConversions(t *testing.T) {
+	r, err := ToHttpRequest(events.APIGatewayV2HTTPRequest{
+		RawPath: "/prod/x", RawQueryString: "q=1",
+		RequestContext: events.APIGatewayV2HTTPRequestContext{
+			Stage: "prod",
+			HTTP:  events.APIGatewayV2HTTPRequestContextHTTPDescription{Method: "GET"},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "/x", r.URL.Path)
+	assert.Equal(t, "q=1", r.URL.RawQuery)
+
+	r, err = ToHttpRequest(events.LambdaFunctionURLRequest{RawPath: "/prod/x"})
+	require.NoError(t, err)
+	assert.Equal(t, "/prod/x", r.URL.Path)
+
+	h := http.Header{}
+	h.Add("X-Multi", "a")
+	h.Add("X-Multi", "b")
+	v2 := FromHttpResponse[events.APIGatewayV2HTTPResponse](201, h, []byte("hi"))
+	assert.Equal(t, 201, v2.StatusCode)
+	assert.Equal(t, "b", v2.Headers["X-Multi"])
+	assert.Equal(t, "hi", v2.Body)
+
+	url := FromHttpResponse[events.LambdaFunctionURLResponse](200, h, nil)
+	assert.Equal(t, "a, b", url.Headers["X-Multi"])
+}
