@@ -4,7 +4,7 @@ import (
 	"context"
 	"os"
 
-	"github.com/aws/aws-lambda-go/events"
+	"github.com/lucaspopp0/go-lambda/eventwrappers"
 	"github.com/lucaspopp0/go-lambda/logs"
 )
 
@@ -15,28 +15,28 @@ const (
 )
 
 func WithLogger(next HandlerFunc) HandlerFunc {
-	return func(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	return func(ctx context.Context, req eventwrappers.HttpRequest) (eventwrappers.HttpResponse, error) {
 		logger := logs.NewLogger(logs.LoggerOpts{
 			Out: os.Stdout,
 		})
 
 		ctx = context.WithValue(ctx, ctxKeyLogger, logger)
 
-		ctx = logs.WithAnnotation(ctx, "request", event)
+		ctx = logs.WithAnnotation(ctx, "request", req.Unwrap())
 
 		logger.Info(ctx, "Request received")
 
-		response, err := next(ctx, event)
-		if err != nil {
+		response, err := next(ctx, req)
+		if err != nil || response == nil {
 			return response, err
 		}
 
-		ctx = logs.WithAnnotation(ctx, "response", response)
+		ctx = logs.WithAnnotation(ctx, "response", response.Unwrap())
 
 		logResponse := logger.Info
-		if response.StatusCode >= 500 {
+		if response.StatusCode() >= 500 {
 			logResponse = logger.Error
-		} else if response.StatusCode >= 400 {
+		} else if response.StatusCode() >= 400 {
 			logResponse = logger.Warn
 		}
 
