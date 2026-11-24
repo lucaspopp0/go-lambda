@@ -7,15 +7,87 @@ import (
 	"strings"
 )
 
-// buildHTTPRequest converts a wrapped Lambda HTTP event into an *http.Request,
-// using path in place of req.Path() so callers can adjust it.
-func buildHTTPRequest(req HttpRequest, path string) (*http.Request, error) {
+// HttpRequest is a common view over the HTTP request events delivered to Lambda.
+type HttpRequest interface {
+	// Method is the HTTP method, e.g. "GET".
+	Method() string
+	// Path is the raw request path, without the query string. For API Gateway v2
+	// events the stage prefix is already stripped.
+	Path() string
+	// RawQuery is the raw (still-encoded) query string, without a leading "?".
+	RawQuery() string
+	// Headers returns a copy of the request headers, keyed as delivered by Lambda.
+	Headers() map[string]string
+	// Header returns the value of the named header (case-insensitive), or "".
+	Header(name string) string
+	// Cookies returns the request cookies as "name=value" strings.
+	Cookies() []string
+	// Body returns the request body, base64-decoding it if needed.
+	Body() ([]byte, error)
+	// ToHTTPRequest converts the event into an *http.Request.
+	ToHTTPRequest() (*http.Request, error)
+	// Unwrap returns the original event value (e.g. events.APIGatewayV2HTTPRequest).
+	Unwrap() any
+}
+
+// UnwrapRequest returns the original event of type T behind req, and whether
+// req actually wraps a T.
+func UnwrapRequest[T any](req HttpRequest) (T, bool) {
+	t, ok := req.Unwrap().(T)
+	return t, ok
+}
+
+// HttpResponse is a common, mutable view over the HTTP response events returned
+// from Lambda handlers.
+type HttpResponse interface {
+	// StatusCode returns the HTTP status code.
+	StatusCode() int
+	// SetStatusCode sets the HTTP status code.
+	SetStatusCode(code int)
+	// Headers returns a copy of the response headers (excluding cookies).
+	Headers() map[string]string
+	// Header returns the value of the named header (case-insensitive), or "".
+	Header(name string) string
+	// SetHeader replaces the named header. Set-Cookie values go to the cookies.
+	SetHeader(name, value string)
+	// AddHeader appends a value to the named header. Where the event only holds
+	// one value per header, values are joined with ", ". Set-Cookie values are
+	// appended to the cookies.
+	AddHeader(name, value string)
+	// Cookies returns the Set-Cookie values.
+	Cookies() []string
+	// Body returns the response body, base64-decoding it if needed.
+	Body() ([]byte, error)
+	// SetBody sets a text body.
+	SetBody(body string)
+	// SetBinaryBody sets a binary body, base64-encoding it in the event.
+	SetBinaryBody(body []byte)
+	// FromHTTPResponse replaces the status, headers, cookies and body with the
+	// given HTTP response parts. Binary content types are base64-encoded.
+	// Multi-valued headers are represented as the event allows: API Gateway v2
+	// keeps the last value in Headers and all values in MultiValueHeaders, while
+	// Function URLs join them with ", ". Set-Cookie values go to the cookies
+	// on Function URLs.
+	FromHTTPResponse(code int, header http.Header, body []byte)
+	// Unwrap returns the original event value (e.g. events.APIGatewayV2HTTPResponse).
+	Unwrap() any
+}
+
+// UnwrapResponse returns the original event of type T behind resp, and whether
+// resp actually wraps a T.
+func UnwrapResponse[T any](resp HttpResponse) (T, bool) {
+	t, ok := resp.Unwrap().(T)
+	return t, ok
+}
+
+// buildHTTPRequest converts a wrapped Lambda HTTP event into an *http.Request.
+func buildHTTPRequest(req HttpRequest) (*http.Request, error) {
 	body, err := req.Body()
 	if err != nil {
 		return nil, err
 	}
 
-	requestURL := path
+	requestURL := req.Path()
 	if rawQuery := req.RawQuery(); rawQuery != "" {
 		requestURL = fmt.Sprintf("%s?%s", requestURL, rawQuery)
 	}

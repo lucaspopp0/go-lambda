@@ -33,7 +33,7 @@ func (r *functionURLRequest) Header(name string) string  { return lookupHeader(r
 func (r *functionURLRequest) Cookies() []string          { return append([]string(nil), r.event.Cookies...) }
 func (r *functionURLRequest) Unwrap() any                { return r.event }
 func (r *functionURLRequest) ToHTTPRequest() (*http.Request, error) {
-	return buildHTTPRequest(r, r.event.RawPath)
+	return buildHTTPRequest(r)
 }
 func (r *functionURLRequest) Body() ([]byte, error) {
 	return decodeBody(r.event.Body, r.event.IsBase64Encoded)

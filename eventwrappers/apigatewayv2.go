@@ -25,8 +25,14 @@ type apiGatewayV2Request struct {
 	event events.APIGatewayV2HTTPRequest
 }
 
-func (r *apiGatewayV2Request) Method() string             { return r.event.RequestContext.HTTP.Method }
-func (r *apiGatewayV2Request) Path() string               { return r.event.RawPath }
+func (r *apiGatewayV2Request) Method() string { return r.event.RequestContext.HTTP.Method }
+func (r *apiGatewayV2Request) Path() string {
+	if stage := r.event.RequestContext.Stage; stage != "" {
+		return strings.TrimPrefix(r.event.RawPath, "/"+stage)
+	}
+	return r.event.RawPath
+}
+
 func (r *apiGatewayV2Request) RawQuery() string           { return r.event.RawQueryString }
 func (r *apiGatewayV2Request) Headers() map[string]string { return copyHeaders(r.event.Headers) }
 func (r *apiGatewayV2Request) Header(name string) string  { return lookupHeader(r.event.Headers, name) }
@@ -34,11 +40,7 @@ func (r *apiGatewayV2Request) Cookies() []string          { return append([]stri
 func (r *apiGatewayV2Request) Unwrap() any                { return r.event }
 
 func (r *apiGatewayV2Request) ToHTTPRequest() (*http.Request, error) {
-	path := r.event.RawPath
-	if stage := r.event.RequestContext.Stage; stage != "" {
-		path = strings.TrimPrefix(path, "/"+stage)
-	}
-	return buildHTTPRequest(r, path)
+	return buildHTTPRequest(r)
 }
 func (r *apiGatewayV2Request) Body() ([]byte, error) {
 	return decodeBody(r.event.Body, r.event.IsBase64Encoded)
