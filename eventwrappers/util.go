@@ -2,14 +2,25 @@ package eventwrappers
 
 import (
 	"encoding/base64"
+	"errors"
+	"fmt"
 	"strings"
 )
+
+// ErrInvalidBody is returned (wrapped) when an event body cannot be decoded,
+// e.g. it is flagged as base64 but is not valid base64. It indicates a bad
+// request rather than a server fault.
+var ErrInvalidBody = errors.New("invalid request body")
 
 func decodeBody(body string, isBase64 bool) ([]byte, error) {
 	if !isBase64 {
 		return []byte(body), nil
 	}
-	return base64.StdEncoding.DecodeString(body)
+	decoded, err := base64.StdEncoding.DecodeString(body)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidBody, err)
+	}
+	return decoded, nil
 }
 
 func encodeBody(body []byte) string {

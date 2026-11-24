@@ -60,7 +60,7 @@ func TestHttpRequest(t *testing.T) {
 	t.Run("invalid-base64-errors", func(t *testing.T) {
 		req := WrapAPIGatewayV2Request(events.APIGatewayV2HTTPRequest{Body: "!!", IsBase64Encoded: true})
 		_, err := req.Body()
-		assert.Error(t, err)
+		assert.ErrorIs(t, err, ErrInvalidBody)
 	})
 }
 
