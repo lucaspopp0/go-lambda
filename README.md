@@ -10,6 +10,7 @@ go get github.com/lucaspopp0/go-lambda
 | --- | --- | --- |
 | [`humaserverless`](#humaserverless) | `github.com/lucaspopp0/go-lambda/humaserverless` | Serve a huma API from API Gateway v2 or Lambda Function URL events |
 | [`middleware`](#middleware) | `github.com/lucaspopp0/go-lambda/middleware` | Composable handler middleware (logging, CORS) for API Gateway v2 |
+| [`eventwrappers`](#eventwrappers) | `github.com/lucaspopp0/go-lambda/eventwrappers` | Common `HttpRequest`/`HttpResponse` interfaces over API Gateway v2 and Function URL events |
 | [`logs`](#logs) | `github.com/lucaspopp0/go-lambda/logs` | Context-aware structured logger built on `log/slog` |
 
 ## humaserverless
@@ -34,6 +35,22 @@ lambda.Start(func(ctx context.Context, e events.LambdaFunctionURLRequest) (event
 // lambda.Start(func(ctx context.Context, e events.LambdaFunctionURLRequest) (events.LambdaFunctionURLResponse, error) {
 //	return humaserverless.Handler[events.LambdaFunctionURLRequest, events.LambdaFunctionURLResponse](ctx, api, e)
 // })
+```
+
+## eventwrappers
+
+`HttpRequest` and `HttpResponse` interfaces that abstract over API Gateway v2 and Lambda Function URL events, so handler logic can be written once. Each wrapper can be unwrapped to the original event type.
+
+```go
+req := eventwrappers.WrapFunctionURLRequest(event)
+resp := eventwrappers.NewFunctionURLResponse(nil)
+resp.SetStatusCode(200)
+resp.SetHeader("Content-Type", "application/json")
+resp.SetBody(`{"path":"` + req.Path() + `"}`)
+
+// Back to the original types
+original, ok := eventwrappers.UnwrapRequest[events.LambdaFunctionURLRequest](req)
+out, _ := eventwrappers.UnwrapResponse[events.LambdaFunctionURLResponse](resp)
 ```
 
 ## middleware
