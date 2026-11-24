@@ -143,7 +143,7 @@ func TestWrapperMutatesProvidedEvent(t *testing.T) {
 	assert.Equal(t, 500, event.StatusCode)
 }
 
-func TestToHTTPRequest(t *testing.T) {
+func TestToHttpRequest(t *testing.T) {
 	t.Run("apigw-v2 strips stage and keeps query, headers, cookies", func(t *testing.T) {
 		event := events.APIGatewayV2HTTPRequest{
 			RawPath: "/prod/users", RawQueryString: "a=1",
@@ -154,7 +154,7 @@ func TestToHTTPRequest(t *testing.T) {
 				HTTP:  events.APIGatewayV2HTTPRequestContextHTTPDescription{Method: "POST"},
 			},
 		}
-		r, err := WrapAPIGatewayV2Request(event).ToHTTPRequest()
+		r, err := WrapAPIGatewayV2Request(event).ToHttpRequest()
 		require.NoError(t, err)
 		assert.Equal(t, "POST", r.Method)
 		assert.Equal(t, "/users", r.URL.Path)
@@ -166,23 +166,23 @@ func TestToHTTPRequest(t *testing.T) {
 	})
 
 	t.Run("function-url does not strip a stage-like prefix", func(t *testing.T) {
-		r, err := WrapFunctionURLRequest(events.LambdaFunctionURLRequest{RawPath: "/prod/users"}).ToHTTPRequest()
+		r, err := WrapFunctionURLRequest(events.LambdaFunctionURLRequest{RawPath: "/prod/users"}).ToHttpRequest()
 		require.NoError(t, err)
 		assert.Equal(t, "/prod/users", r.URL.Path)
 	})
 
 	t.Run("invalid base64 errors", func(t *testing.T) {
-		_, err := WrapFunctionURLRequest(events.LambdaFunctionURLRequest{Body: "!!", IsBase64Encoded: true}).ToHTTPRequest()
+		_, err := WrapFunctionURLRequest(events.LambdaFunctionURLRequest{Body: "!!", IsBase64Encoded: true}).ToHttpRequest()
 		assert.Error(t, err)
 	})
 }
 
 func fromHTTP[T any](resp HttpResponse, code int, h http.Header, body []byte) (T, bool) {
-	resp.FromHTTPResponse(code, h, body)
+	resp.FromHttpResponse(code, h, body)
 	return UnwrapResponse[T](resp)
 }
 
-func TestFromHTTPResponse(t *testing.T) {
+func TestFromHttpResponse(t *testing.T) {
 	h := http.Header{}
 	h.Add("Content-Type", "image/png")
 	h.Add("X-Multi", "a")
@@ -241,4 +241,21 @@ func TestGenericConversions(t *testing.T) {
 
 	url := FromHttpResponse[events.LambdaFunctionURLResponse](200, h, nil)
 	assert.Equal(t, "a, b", url.Headers["X-Multi"])
+}
+
+func TestWrapRequestAndResponse(t *testing.T) {
+	req := WrapRequest(events.LambdaFunctionURLRequest{RawPath: "/a"})
+	assert.Equal(t, "/a", req.Path())
+	_, ok := UnwrapRequest[events.LambdaFunctionURLRequest](req)
+	assert.True(t, ok)
+
+	event := &events.APIGatewayV2HTTPResponse{StatusCode: 200}
+	resp := WrapResponse(event)
+	resp.SetStatusCode(418)
+	assert.Equal(t, 418, event.StatusCode)
+
+	empty := WrapResponse[events.LambdaFunctionURLResponse](nil)
+	assert.Equal(t, 200, empty.StatusCode())
+	_, ok = UnwrapResponse[events.LambdaFunctionURLResponse](empty)
+	assert.True(t, ok)
 }

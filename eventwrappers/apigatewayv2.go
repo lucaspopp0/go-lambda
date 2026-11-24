@@ -39,8 +39,8 @@ func (r *apiGatewayV2Request) Header(name string) string  { return lookupHeader(
 func (r *apiGatewayV2Request) Cookies() []string          { return append([]string(nil), r.event.Cookies...) }
 func (r *apiGatewayV2Request) Unwrap() any                { return r.event }
 
-func (r *apiGatewayV2Request) ToHTTPRequest() (*http.Request, error) {
-	return buildHTTPRequest(r)
+func (r *apiGatewayV2Request) ToHttpRequest() (*http.Request, error) {
+	return buildHttpRequest(r)
 }
 func (r *apiGatewayV2Request) Body() ([]byte, error) {
 	return decodeBody(r.event.Body, r.event.IsBase64Encoded)
@@ -95,7 +95,7 @@ func (r *apiGatewayV2Response) AddHeader(name, value string) {
 	r.SetHeader(name, value)
 }
 
-func (r *apiGatewayV2Response) FromHTTPResponse(code int, header http.Header, body []byte) {
+func (r *apiGatewayV2Response) FromHttpResponse(code int, header http.Header, body []byte) {
 	r.event.StatusCode = code
 	r.event.Cookies = nil
 	r.event.Headers = map[string]string{}
@@ -108,5 +108,5 @@ func (r *apiGatewayV2Response) FromHTTPResponse(code int, header http.Header, bo
 		}
 	}
 
-	setHTTPBody(r, r.event.Headers["Content-Type"], body)
+	setHttpBody(r, r.event.Headers["Content-Type"], body)
 }

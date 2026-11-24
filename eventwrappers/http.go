@@ -19,29 +19,42 @@ type ResponseEvent interface {
 	events.APIGatewayV2HTTPResponse | events.LambdaFunctionURLResponse
 }
 
-// ToHttpRequest wraps the given Lambda request event and converts it into an
-// *http.Request, by calling HttpRequest.ToHTTPRequest on the matching wrapper.
-func ToHttpRequest[T RequestEvent](event T) (*http.Request, error) {
+// WrapRequest wraps the given Lambda request event in the matching HttpRequest.
+func WrapRequest[T RequestEvent](event T) HttpRequest {
 	switch e := any(event).(type) {
 	case events.APIGatewayV2HTTPRequest:
-		return WrapAPIGatewayV2Request(e).ToHTTPRequest()
+		return WrapAPIGatewayV2Request(e)
 	case events.LambdaFunctionURLRequest:
-		return WrapFunctionURLRequest(e).ToHTTPRequest()
+		return WrapFunctionURLRequest(e)
 	}
 	panic("eventwrappers: unreachable: unsupported request event type")
 }
 
+// WrapResponse wraps the given Lambda response event in the matching
+// HttpResponse. The wrapper mutates the event; pass nil for a new, empty 200
+// response.
+func WrapResponse[T ResponseEvent](event *T) HttpResponse {
+	switch e := any(event).(type) {
+	case *events.APIGatewayV2HTTPResponse:
+		return NewAPIGatewayV2Response(e)
+	case *events.LambdaFunctionURLResponse:
+		return NewFunctionURLResponse(e)
+	}
+	panic("eventwrappers: unreachable: unsupported response event type")
+}
+
+// ToHttpRequest wraps the given Lambda request event and converts it into an
+// *http.Request, by calling HttpRequest.ToHttpRequest on the wrapper.
+func ToHttpRequest[T RequestEvent](event T) (*http.Request, error) {
+	return WrapRequest(event).ToHttpRequest()
+}
+
 // FromHttpResponse creates a new, empty Lambda response event of type T and
 // fills it from the given HTTP response parts, by calling
-// HttpResponse.FromHTTPResponse on the matching wrapper.
+// HttpResponse.FromHttpResponse on the wrapper.
 func FromHttpResponse[T ResponseEvent](code int, header http.Header, body []byte) T {
 	var event T
-	switch e := any(&event).(type) {
-	case *events.APIGatewayV2HTTPResponse:
-		NewAPIGatewayV2Response(e).FromHTTPResponse(code, header, body)
-	case *events.LambdaFunctionURLResponse:
-		NewFunctionURLResponse(e).FromHTTPResponse(code, header, body)
-	}
+	WrapResponse(&event).FromHttpResponse(code, header, body)
 	return event
 }
 
@@ -62,8 +75,8 @@ type HttpRequest interface {
 	Cookies() []string
 	// Body returns the request body, base64-decoding it if needed.
 	Body() ([]byte, error)
-	// ToHTTPRequest converts the event into an *http.Request.
-	ToHTTPRequest() (*http.Request, error)
+	// ToHttpRequest converts the event into an *http.Request.
+	ToHttpRequest() (*http.Request, error)
 	// Unwrap returns the original event value (e.g. events.APIGatewayV2HTTPRequest).
 	Unwrap() any
 }
@@ -100,13 +113,13 @@ type HttpResponse interface {
 	SetBody(body string)
 	// SetBinaryBody sets a binary body, base64-encoding it in the event.
 	SetBinaryBody(body []byte)
-	// FromHTTPResponse replaces the status, headers, cookies and body with the
+	// FromHttpResponse replaces the status, headers, cookies and body with the
 	// given HTTP response parts. Binary content types are base64-encoded.
 	// Multi-valued headers are represented as the event allows: API Gateway v2
 	// keeps the last value in Headers and all values in MultiValueHeaders, while
 	// Function URLs join them with ", ". Set-Cookie values go to the cookies
 	// on Function URLs.
-	FromHTTPResponse(code int, header http.Header, body []byte)
+	FromHttpResponse(code int, header http.Header, body []byte)
 	// Unwrap returns the original event value (e.g. events.APIGatewayV2HTTPResponse).
 	Unwrap() any
 }
@@ -118,8 +131,8 @@ func UnwrapResponse[T any](resp HttpResponse) (T, bool) {
 	return t, ok
 }
 
-// buildHTTPRequest converts a wrapped Lambda HTTP event into an *http.Request.
-func buildHTTPRequest(req HttpRequest) (*http.Request, error) {
+// buildHttpRequest converts a wrapped Lambda HTTP event into an *http.Request.
+func buildHttpRequest(req HttpRequest) (*http.Request, error) {
 	body, err := req.Body()
 	if err != nil {
 		return nil, err
@@ -146,8 +159,8 @@ func buildHTTPRequest(req HttpRequest) (*http.Request, error) {
 	return request, nil
 }
 
-// setHTTPBody stores body as text, or base64-encoded for binary content types.
-func setHTTPBody(resp HttpResponse, contentType string, body []byte) {
+// setHttpBody stores body as text, or base64-encoded for binary content types.
+func setHttpBody(resp HttpResponse, contentType string, body []byte) {
 	if isBinaryContentType(contentType) {
 		resp.SetBinaryBody(body)
 	} else {

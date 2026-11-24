@@ -48,9 +48,9 @@ resp.SetStatusCode(200)
 resp.SetHeader("Content-Type", "application/json")
 resp.SetBody(`{"path":"` + req.Path() + `"}`)
 
-// Convert to / from net/http
-httpReq, _ := req.ToHTTPRequest()
-resp.FromHTTPResponse(code, header, body)
+// Wrap generically, and convert to / from net/http
+httpReq, _ := req.ToHttpRequest()
+resp.FromHttpResponse(code, header, body)
 
 // Or, straight from the event types
 httpReq, _ = eventwrappers.ToHttpRequest(event)
