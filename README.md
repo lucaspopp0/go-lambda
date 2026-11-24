@@ -1,6 +1,3 @@
-# template
-Template for new repositories
-
 ## humaserverless
 
 Serve a [huma](https://huma.rocks) API from Lambda. Supports API Gateway v2 (HTTP API) and Lambda Function URL events.
