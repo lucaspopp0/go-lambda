@@ -9,18 +9,18 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 )
 
-// RequestEvent is the set of Lambda HTTP request events that can be wrapped.
-type RequestEvent interface {
+// HTTPRequestEvent is the set of Lambda HTTP request events that can be wrapped.
+type HTTPRequestEvent interface {
 	events.APIGatewayV2HTTPRequest | events.LambdaFunctionURLRequest
 }
 
-// ResponseEvent is the set of Lambda HTTP response events that can be wrapped.
-type ResponseEvent interface {
+// HTTPResponseEvent is the set of Lambda HTTP response events that can be wrapped.
+type HTTPResponseEvent interface {
 	events.APIGatewayV2HTTPResponse | events.LambdaFunctionURLResponse
 }
 
 // WrapRequest wraps the given Lambda request event in the matching HttpRequest.
-func WrapRequest[T RequestEvent](event T) HttpRequest {
+func WrapRequest[T HTTPRequestEvent](event T) HttpRequest {
 	switch e := any(event).(type) {
 	case events.APIGatewayV2HTTPRequest:
 		return WrapAPIGatewayV2Request(e)
@@ -33,7 +33,7 @@ func WrapRequest[T RequestEvent](event T) HttpRequest {
 // WrapResponse wraps the given Lambda response event in the matching
 // HttpResponse. The wrapper mutates the event; pass nil for a new, empty 200
 // response.
-func WrapResponse[T ResponseEvent](event *T) HttpResponse {
+func WrapResponse[T HTTPResponseEvent](event *T) HttpResponse {
 	switch e := any(event).(type) {
 	case *events.APIGatewayV2HTTPResponse:
 		return NewAPIGatewayV2Response(e)
@@ -45,14 +45,14 @@ func WrapResponse[T ResponseEvent](event *T) HttpResponse {
 
 // ToHttpRequest wraps the given Lambda request event and converts it into an
 // *http.Request, by calling HttpRequest.ToHttpRequest on the wrapper.
-func ToHttpRequest[T RequestEvent](event T) (*http.Request, error) {
+func ToHttpRequest[T HTTPRequestEvent](event T) (*http.Request, error) {
 	return WrapRequest(event).ToHttpRequest()
 }
 
 // FromHttpResponse creates a new, empty Lambda response event of type T and
 // fills it from the given HTTP response parts, by calling
 // HttpResponse.FromHttpResponse on the wrapper.
-func FromHttpResponse[T ResponseEvent](code int, header http.Header, body []byte) T {
+func FromHttpResponse[T HTTPResponseEvent](code int, header http.Header, body []byte) T {
 	var event T
 	WrapResponse(&event).FromHttpResponse(code, header, body)
 	return event
