@@ -117,7 +117,46 @@ func addOAuthSecurityScheme(spec *huma.OpenAPI, opts ApiOpts) {
 	}
 }
 
-// HttpHandler handles a single request using a pre-built API (caller must register routes).
+// Request is the set of Lambda event types that can be served.
+type Request interface {
+	events.APIGatewayV2HTTPRequest | events.LambdaFunctionURLRequest
+}
+
+// Response is the set of Lambda response types matching Request.
+type Response interface {
+	events.APIGatewayV2HTTPResponse | events.LambdaFunctionURLResponse
+}
+
+// Handler handles a single event of either supported type using a pre-built API
+// (caller must register routes). The response type must match the request type:
+// APIGatewayV2HTTPRequest -> APIGatewayV2HTTPResponse,
+// LambdaFunctionURLRequest -> LambdaFunctionURLResponse.
+func Handler[Req Request, Resp Response](
+	ctx context.Context,
+	api huma.API,
+	event Req,
+) (Resp, error) {
+	var resp Resp
+
+	switch e := any(event).(type) {
+	case events.APIGatewayV2HTTPRequest:
+		out, ok := any(&resp).(*events.APIGatewayV2HTTPResponse)
+		if !ok {
+			return resp, fmt.Errorf("humaserverless: response type %T does not match request type %T", resp, event)
+		}
+		*out, _ = HttpHandler(ctx, api, e)
+	case events.LambdaFunctionURLRequest:
+		out, ok := any(&resp).(*events.LambdaFunctionURLResponse)
+		if !ok {
+			return resp, fmt.Errorf("humaserverless: response type %T does not match request type %T", resp, event)
+		}
+		*out, _ = FunctionURLHandler(ctx, api, e)
+	}
+
+	return resp, nil
+}
+
+// HttpHandler handles a single API Gateway v2 request using a pre-built API (caller must register routes).
 func HttpHandler(
 	ctx context.Context,
 	api huma.API,
@@ -131,6 +170,25 @@ func HttpHandler(
 		}, nil
 	}
 	response := httptest.NewRecorder()
-	api.Adapter().ServeHTTP(response, request)
+	api.Adapter().ServeHTTP(response, request.WithContext(ctx))
 	return *ResponseToEvent(*response), nil
+}
+
+// FunctionURLHandler handles a single Lambda function URL request using a pre-built API
+// (caller must register routes).
+func FunctionURLHandler(
+	ctx context.Context,
+	api huma.API,
+	event events.LambdaFunctionURLRequest,
+) (events.LambdaFunctionURLResponse, error) {
+	request, err := FunctionURLEventToRequest(event)
+	if err != nil {
+		return events.LambdaFunctionURLResponse{
+			StatusCode: http.StatusInternalServerError,
+			Body:       err.Error(),
+		}, nil
+	}
+	response := httptest.NewRecorder()
+	api.Adapter().ServeHTTP(response, request.WithContext(ctx))
+	return *ResponseToFunctionURLEvent(*response), nil
 }

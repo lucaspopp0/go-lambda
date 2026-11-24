@@ -459,3 +459,38 @@ func TestResponseToEvent(t *testing.T) {
 		assert.Equal(t, pngBytes, decoded)
 	})
 }
+
+func TestFunctionURLEventToRequest(t *testing.T) {
+	t.Run("path is not stage-stripped and query is preserved", func(t *testing.T) {
+		req, err := FunctionURLEventToRequest(events.LambdaFunctionURLRequest{
+			RawPath:        "/prod/items",
+			RawQueryString: "a=1&b=2",
+			Cookies:        []string{"a=1", "b=2"},
+			RequestContext: events.LambdaFunctionURLRequestContext{
+				HTTP: events.LambdaFunctionURLRequestContextHTTPDescription{Method: "GET"},
+			},
+		})
+		require.NoError(t, err)
+		assert.Equal(t, "/prod/items", req.URL.Path)
+		assert.Equal(t, "a=1&b=2", req.URL.RawQuery)
+		assert.Equal(t, "a=1; b=2", req.Header.Get("Cookie"))
+	})
+}
+
+func TestResponseToFunctionURLEvent(t *testing.T) {
+	t.Run("cookies split out and binary encoded", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		rec.Header().Add("Set-Cookie", "a=1")
+		rec.Header().Add("Set-Cookie", "b=2")
+		rec.Header().Set("Content-Type", "image/png")
+		rec.WriteHeader(201)
+		_, _ = rec.Write([]byte{1, 2, 3})
+
+		event := ResponseToFunctionURLEvent(*rec)
+		assert.Equal(t, 201, event.StatusCode)
+		assert.Equal(t, []string{"a=1", "b=2"}, event.Cookies)
+		assert.NotContains(t, event.Headers, "Set-Cookie")
+		assert.True(t, event.IsBase64Encoded)
+		assert.Equal(t, "AQID", event.Body)
+	})
+}
