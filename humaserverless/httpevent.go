@@ -1,14 +1,15 @@
 package humaserverless
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
+	"github.com/lucaspopp0/go-lambda/eventwrappers"
 )
 
 // Convert the API Gateway event into a HTTP request
@@ -19,56 +20,38 @@ func EventToRequest(event events.APIGatewayV2HTTPRequest) (*http.Request, error)
 			fmt.Sprintf("/%s", event.RequestContext.Stage))
 	}
 
-	return buildRequest(
-		event.RequestContext.HTTP.Method,
-		requestURL,
-		event.RawQueryString,
-		event.Body,
-		event.IsBase64Encoded,
-		event.Headers,
-		event.Cookies,
-	)
+	return buildRequest(eventwrappers.WrapAPIGatewayV2Request(event), requestURL)
 }
 
 // Convert the Lambda function URL event into a HTTP request
 func FunctionURLEventToRequest(event events.LambdaFunctionURLRequest) (*http.Request, error) {
-	return buildRequest(
-		event.RequestContext.HTTP.Method,
-		event.RawPath,
-		event.RawQueryString,
-		event.Body,
-		event.IsBase64Encoded,
-		event.Headers,
-		event.Cookies,
-	)
+	req := eventwrappers.WrapFunctionURLRequest(event)
+	return buildRequest(req, req.Path())
 }
 
-func buildRequest(
-	method, path, rawQuery, body string,
-	isBase64 bool,
-	headers map[string]string,
-	cookies []string,
-) (*http.Request, error) {
-	var bodyReader io.Reader = strings.NewReader(body)
-	if isBase64 {
-		bodyReader = base64.NewDecoder(base64.StdEncoding, bodyReader)
-	}
-
-	requestURL := path
-	if rawQuery != "" {
-		requestURL = fmt.Sprintf("%s?%s", requestURL, rawQuery)
-	}
-
-	request, err := http.NewRequest(method, requestURL, bodyReader)
+// buildRequest converts any wrapped Lambda HTTP event into an http.Request.
+// path overrides req.Path() so callers can adjust it (e.g. strip a stage prefix).
+func buildRequest(req eventwrappers.HttpRequest, path string) (*http.Request, error) {
+	body, err := req.Body()
 	if err != nil {
 		return nil, err
 	}
 
-	for headerName, headerVal := range headers {
+	requestURL := path
+	if rawQuery := req.RawQuery(); rawQuery != "" {
+		requestURL = fmt.Sprintf("%s?%s", requestURL, rawQuery)
+	}
+
+	request, err := http.NewRequest(req.Method(), requestURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+
+	for headerName, headerVal := range req.Headers() {
 		request.Header.Set(headerName, headerVal)
 	}
 
-	if len(cookies) > 0 {
+	if cookies := req.Cookies(); len(cookies) > 0 {
 		request.Header.Set("Cookie", strings.Join(cookies, "; "))
 	}
 
