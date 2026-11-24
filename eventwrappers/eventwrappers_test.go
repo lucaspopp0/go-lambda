@@ -2,6 +2,8 @@ package eventwrappers
 
 import (
 	"encoding/base64"
+	"io"
+	"net/http"
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -139,4 +141,71 @@ func TestWrapperMutatesProvidedEvent(t *testing.T) {
 	event := &events.LambdaFunctionURLResponse{StatusCode: 200}
 	NewFunctionURLResponse(event).SetStatusCode(500)
 	assert.Equal(t, 500, event.StatusCode)
+}
+
+func TestToHTTPRequest(t *testing.T) {
+	t.Run("apigw-v2 strips stage and keeps query, headers, cookies", func(t *testing.T) {
+		event := events.APIGatewayV2HTTPRequest{
+			RawPath: "/prod/users", RawQueryString: "a=1",
+			Headers: map[string]string{"X-Test": "v"}, Cookies: []string{"a=1", "b=2"},
+			Body: base64.StdEncoding.EncodeToString([]byte("hi")), IsBase64Encoded: true,
+			RequestContext: events.APIGatewayV2HTTPRequestContext{
+				Stage: "prod",
+				HTTP:  events.APIGatewayV2HTTPRequestContextHTTPDescription{Method: "POST"},
+			},
+		}
+		r, err := ToHTTPRequest(WrapAPIGatewayV2Request(event))
+		require.NoError(t, err)
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/users", r.URL.Path)
+		assert.Equal(t, "a=1", r.URL.RawQuery)
+		assert.Equal(t, "v", r.Header.Get("X-Test"))
+		assert.Equal(t, "a=1; b=2", r.Header.Get("Cookie"))
+		b, _ := io.ReadAll(r.Body)
+		assert.Equal(t, "hi", string(b))
+	})
+
+	t.Run("function-url does not strip a stage-like prefix", func(t *testing.T) {
+		r, err := ToHTTPRequest(WrapFunctionURLRequest(events.LambdaFunctionURLRequest{RawPath: "/prod/users"}))
+		require.NoError(t, err)
+		assert.Equal(t, "/prod/users", r.URL.Path)
+	})
+
+	t.Run("invalid base64 errors", func(t *testing.T) {
+		_, err := ToHTTPRequest(WrapFunctionURLRequest(events.LambdaFunctionURLRequest{Body: "!!", IsBase64Encoded: true}))
+		assert.Error(t, err)
+	})
+}
+
+func TestResponseFromHTTP(t *testing.T) {
+	h := http.Header{}
+	h.Add("Content-Type", "image/png")
+	h.Add("X-Multi", "a")
+	h.Add("X-Multi", "b")
+	h.Add("Set-Cookie", "a=1")
+	h.Add("Set-Cookie", "b=2")
+
+	t.Run("apigw-v2", func(t *testing.T) {
+		e, ok := UnwrapResponse[events.APIGatewayV2HTTPResponse](APIGatewayV2ResponseFromHTTP(201, h, []byte{1, 2}))
+		require.True(t, ok)
+		assert.Equal(t, 201, e.StatusCode)
+		assert.Equal(t, "b", e.Headers["X-Multi"])
+		assert.Equal(t, []string{"a", "b"}, e.MultiValueHeaders["X-Multi"])
+		assert.True(t, e.IsBase64Encoded)
+	})
+
+	t.Run("function-url", func(t *testing.T) {
+		e, ok := UnwrapResponse[events.LambdaFunctionURLResponse](FunctionURLResponseFromHTTP(200, h, []byte{1, 2}))
+		require.True(t, ok)
+		assert.Equal(t, "a, b", e.Headers["X-Multi"])
+		assert.Equal(t, []string{"a=1", "b=2"}, e.Cookies)
+		assert.NotContains(t, e.Headers, "Set-Cookie")
+		assert.True(t, e.IsBase64Encoded)
+	})
+
+	t.Run("text body", func(t *testing.T) {
+		e, _ := UnwrapResponse[events.LambdaFunctionURLResponse](FunctionURLResponseFromHTTP(200, http.Header{}, []byte("hi")))
+		assert.Equal(t, "hi", e.Body)
+		assert.False(t, e.IsBase64Encoded)
+	})
 }

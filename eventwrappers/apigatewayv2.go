@@ -31,6 +31,7 @@ func (r *apiGatewayV2Request) Headers() map[string]string { return copyHeaders(r
 func (r *apiGatewayV2Request) Header(name string) string  { return lookupHeader(r.event.Headers, name) }
 func (r *apiGatewayV2Request) Cookies() []string          { return append([]string(nil), r.event.Cookies...) }
 func (r *apiGatewayV2Request) Unwrap() any                { return r.event }
+func (r *apiGatewayV2Request) stage() string              { return r.event.RequestContext.Stage }
 func (r *apiGatewayV2Request) Body() ([]byte, error) {
 	return decodeBody(r.event.Body, r.event.IsBase64Encoded)
 }
