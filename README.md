@@ -63,7 +63,7 @@ out, _ := eventwrappers.UnwrapResponse[events.LambdaFunctionURLResponse](resp)
 
 ## middleware
 
-Handler middleware for HTTP Lambda handlers, independent of the event type. Middleware wraps a `middleware.HandlerFunc`, which has the signature `func(ctx, eventwrappers.HttpRequest) (eventwrappers.HttpResponse, error)`, so it works for both API Gateway v2 (HTTP API) and Lambda Function URL events. `middleware.Adapt` converts a `HandlerFunc` into a handler for a concrete event type.
+Handler middleware for HTTP Lambda handlers, independent of the event type. Middleware wraps a `middleware.HandlerFunc`, which has the signature `func(ctx, eventwrappers.HttpRequest) (eventwrappers.HttpResponse, error)`, so it works for both API Gateway v2 (HTTP API) and Lambda Function URL events. `middleware.WithTypes` converts a `HandlerFunc` into a handler for a concrete event type.
 
 - `WithLogger` creates a `logs.Logger`, stores it in the context, and logs each request and response with the event attached as annotations. Responses are logged at error level for 5xx, warn for 4xx, and info otherwise.
 - `GetLogger(ctx)` retrieves that logger, falling back to a default stdout logger (with a warning) if none is set.
@@ -79,10 +79,10 @@ handler := middleware.WithLogger(
 )
 
 // API Gateway v2
-lambda.Start(middleware.Adapt[events.APIGatewayV2HTTPRequest, events.APIGatewayV2HTTPResponse](handler))
+lambda.Start(middleware.WithTypes[events.APIGatewayV2HTTPRequest, events.APIGatewayV2HTTPResponse](handler))
 
 // ...or a Function URL
-lambda.Start(middleware.Adapt[events.LambdaFunctionURLRequest, events.LambdaFunctionURLResponse](handler))
+lambda.Start(middleware.WithTypes[events.LambdaFunctionURLRequest, events.LambdaFunctionURLResponse](handler))
 ```
 
 ## logs

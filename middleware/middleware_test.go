@@ -22,7 +22,7 @@ func okHandler(ctx context.Context, req eventwrappers.HttpRequest) (eventwrapper
 }
 
 func TestAdaptAPIGatewayV2(t *testing.T) {
-	h := Adapt[events.APIGatewayV2HTTPRequest, events.APIGatewayV2HTTPResponse](chain(okHandler))
+	h := WithTypes[events.APIGatewayV2HTTPRequest, events.APIGatewayV2HTTPResponse](chain(okHandler))
 
 	out, err := h(context.Background(), events.APIGatewayV2HTTPRequest{
 		RawPath: "/foo",
@@ -35,7 +35,7 @@ func TestAdaptAPIGatewayV2(t *testing.T) {
 }
 
 func TestAdaptFunctionURL(t *testing.T) {
-	h := Adapt[events.LambdaFunctionURLRequest, events.LambdaFunctionURLResponse](chain(okHandler))
+	h := WithTypes[events.LambdaFunctionURLRequest, events.LambdaFunctionURLResponse](chain(okHandler))
 
 	out, err := h(context.Background(), events.LambdaFunctionURLRequest{
 		RawPath: "/bar",
@@ -51,7 +51,7 @@ func TestCORSConvertsErrorTo500(t *testing.T) {
 	failing := func(ctx context.Context, req eventwrappers.HttpRequest) (eventwrappers.HttpResponse, error) {
 		return nil, errors.New("boom")
 	}
-	h := Adapt[events.LambdaFunctionURLRequest, events.LambdaFunctionURLResponse](chain(failing))
+	h := WithTypes[events.LambdaFunctionURLRequest, events.LambdaFunctionURLResponse](chain(failing))
 
 	out, err := h(context.Background(), events.LambdaFunctionURLRequest{})
 	require.NoError(t, err)

@@ -12,15 +12,15 @@ import (
 // eventwrappers.HttpRequest / eventwrappers.HttpResponse views, so the same
 // middleware works for API Gateway v2 and Lambda Function URL events.
 //
-// Use Adapt to turn a HandlerFunc into a function that can be passed to
+// Use WithTypes to turn a HandlerFunc into a function that can be passed to
 // lambda.Start.
 type HandlerFunc func(ctx context.Context, req eventwrappers.HttpRequest) (eventwrappers.HttpResponse, error)
 
-// Adapt converts a HandlerFunc into a handler for the concrete Lambda event
+// WithTypes converts a HandlerFunc into a handler for the concrete Lambda event
 // types Req and Res, e.g.
 //
-//	lambda.Start(middleware.Adapt[events.APIGatewayV2HTTPRequest, events.APIGatewayV2HTTPResponse](handler))
-func Adapt[Req eventwrappers.HttpRequestEvent, Res eventwrappers.HttpResponseEvent](h HandlerFunc) func(context.Context, Req) (Res, error) {
+//	lambda.Start(middleware.WithTypes[events.APIGatewayV2HTTPRequest, events.APIGatewayV2HTTPResponse](handler))
+func WithTypes[Req eventwrappers.HttpRequestEvent, Res eventwrappers.HttpResponseEvent](h HandlerFunc) func(context.Context, Req) (Res, error) {
 	return func(ctx context.Context, event Req) (Res, error) {
 		var zero Res
 
