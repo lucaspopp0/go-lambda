@@ -43,6 +43,19 @@ func WrapResponse[T HttpResponseEvent](event *T) HttpResponse {
 	panic("eventwrappers: unreachable: unsupported response event type")
 }
 
+// NewResponseFor creates a new, empty 200 response of the event type that
+// matches req (e.g. an API Gateway v2 request gets an API Gateway v2 response).
+// It returns nil if req does not wrap a supported event type.
+func NewResponseFor(req HttpRequest) HttpResponse {
+	switch req.Unwrap().(type) {
+	case events.APIGatewayV2HTTPRequest:
+		return NewAPIGatewayV2Response(nil)
+	case events.LambdaFunctionURLRequest:
+		return NewFunctionURLResponse(nil)
+	}
+	return nil
+}
+
 // ToHttpRequest wraps the given Lambda request event and converts it into an
 // *http.Request, by calling HttpRequest.ToHttpRequest on the wrapper.
 func ToHttpRequest[T HttpRequestEvent](event T) (*http.Request, error) {

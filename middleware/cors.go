@@ -5,7 +5,6 @@ import (
 	"log"
 	"slices"
 
-	"github.com/aws/aws-lambda-go/events"
 	"github.com/lucaspopp0/go-lambda/eventwrappers"
 )
 
@@ -19,28 +18,29 @@ var ValidOrigins = []string{
 
 func WithCORS(opts CORSOptions) func(next HandlerFunc) HandlerFunc {
 	return func(next HandlerFunc) HandlerFunc {
-		return func(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-			requestOrigin := eventwrappers.WrapAPIGatewayV2Request(event).Header("Origin")
+		return func(ctx context.Context, req eventwrappers.HttpRequest) (eventwrappers.HttpResponse, error) {
+			requestOrigin := req.Header("Origin")
 
-			response, err := next(ctx, event)
+			response, err := next(ctx, req)
 			if err != nil {
 				log.Printf("caught error: %v", err)
-				return events.APIGatewayV2HTTPResponse{
-					StatusCode: 500,
-					Body:       err.Error(),
-				}, nil
+
+				response = eventwrappers.NewResponseFor(req)
+				if response == nil {
+					// Unsupported event type; nothing to build an error response from
+					return nil, err
+				}
+
+				response.SetStatusCode(500)
+				response.SetBody(err.Error())
 			}
 
-			if response.Headers == nil {
-				response.Headers = make(map[string]string)
-			}
-
-			response.Headers["Access-Control-Allow-Methods"] = "*"
-			response.Headers["Access-Control-Allow-Headers"] = "*"
-			response.Headers["Access-Control-Allow-Credentials"] = "true"
+			response.SetHeader("Access-Control-Allow-Methods", "*")
+			response.SetHeader("Access-Control-Allow-Headers", "*")
+			response.SetHeader("Access-Control-Allow-Credentials", "true")
 
 			if requestOrigin != "" && slices.Contains(opts.ValidOrigins, requestOrigin) {
-				response.Headers["Access-Control-Allow-Origin"] = requestOrigin
+				response.SetHeader("Access-Control-Allow-Origin", requestOrigin)
 			}
 
 			return response, nil

@@ -9,7 +9,7 @@ go get github.com/lucaspopp0/go-lambda
 | Package | Import path | Purpose |
 | --- | --- | --- |
 | [`humaserverless`](#humaserverless) | `github.com/lucaspopp0/go-lambda/humaserverless` | Serve a huma API from API Gateway v2 or Lambda Function URL events |
-| [`middleware`](#middleware) | `github.com/lucaspopp0/go-lambda/middleware` | Composable handler middleware (logging, CORS) for API Gateway v2 |
+| [`middleware`](#middleware) | `github.com/lucaspopp0/go-lambda/middleware` | Composable handler middleware (logging, CORS) for API Gateway v2 and Function URL events |
 | [`eventwrappers`](#eventwrappers) | `github.com/lucaspopp0/go-lambda/eventwrappers` | Common `HttpRequest`/`HttpResponse` interfaces over API Gateway v2 and Function URL events |
 | [`logs`](#logs) | `github.com/lucaspopp0/go-lambda/logs` | Context-aware structured logger built on `log/slog` |
 
@@ -63,7 +63,7 @@ out, _ := eventwrappers.UnwrapResponse[events.LambdaFunctionURLResponse](resp)
 
 ## middleware
 
-Handler middleware for API Gateway v2 (HTTP API) Lambda handlers. Middleware wraps a `middleware.HandlerFunc`, which has the signature `func(ctx, events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error)`.
+Handler middleware for HTTP Lambda handlers, independent of the event type. Middleware wraps a `middleware.HandlerFunc`, which has the signature `func(ctx, eventwrappers.HttpRequest) (eventwrappers.HttpResponse, error)`, so it works for both API Gateway v2 (HTTP API) and Lambda Function URL events. `middleware.WithTypes` converts a `HandlerFunc` into a handler for a concrete event type.
 
 - `WithLogger` creates a `logs.Logger`, stores it in the context, and logs each request and response with the event attached as annotations. Responses are logged at error level for 5xx, warn for 4xx, and info otherwise.
 - `GetLogger(ctx)` retrieves that logger, falling back to a default stdout logger (with a warning) if none is set.
@@ -71,16 +71,19 @@ Handler middleware for API Gateway v2 (HTTP API) Lambda handlers. Middleware wra
 - `DefaultChain` wraps a handler in `WithLogger` and `WithCORS`. It only allows the origin `http://localhost:8081`, so build your own chain for other origins.
 
 ```go
+// myHandler is a middleware.HandlerFunc
 handler := middleware.WithLogger(
 	middleware.WithCORS(middleware.CORSOptions{
 		ValidOrigins: []string{"https://app.example.com"},
 	})(myHandler),
 )
 
-lambda.Start(handler)
-```
+// API Gateway v2
+lambda.Start(middleware.WithTypes[events.APIGatewayV2HTTPRequest, events.APIGatewayV2HTTPResponse](handler))
 
-`middleware` currently supports only API Gateway v2 events, not Lambda Function URL events.
+// ...or a Function URL
+lambda.Start(middleware.WithTypes[events.LambdaFunctionURLRequest, events.LambdaFunctionURLResponse](handler))
+```
 
 ## logs
 
